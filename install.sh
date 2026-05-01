@@ -62,6 +62,17 @@ else
   echo "  WARNING: plist not found at $PLIST_SRC"
 fi
 
+# Configure system proxy on all network services (requires admin)
+# This is critical for Chrome to pick up the PAC when WireGuard is active
+PAC_URL="http://127.0.0.1:1081/proxy.pac"
+echo "Configuring system proxy (may prompt for password)..."
+ALL_SERVICES=$(networksetup -listallnetworkservices 2>/dev/null | tail -n +2)
+SCRIPT=""
+while IFS= read -r svc; do
+  SCRIPT+="networksetup -setautoproxyurl \"$svc\" \"$PAC_URL\" 2>/dev/null; networksetup -setautoproxystate \"$svc\" on 2>/dev/null; "
+done <<< "$ALL_SERVICES"
+osascript -e "do shell script \"$SCRIPT\" with administrator privileges" 2>/dev/null && echo "  Proxy set on all network services" || echo "  WARNING: could not set system proxy (skipped)"
+
 echo ""
 echo "Done."
 echo ""
@@ -70,8 +81,9 @@ echo "Config:   $CONFIG_DIR/doh.conf"
 echo "PAC file: $CONFIG_DIR/proxy.pac"
 echo "Log:      ~/Library/Logs/crabbyproxy.log"
 echo ""
-echo "Next step: Configure your browser proxy to:"
-echo "  file://$CONFIG_DIR/proxy.pac"
+echo "Browser PAC URL (Chrome/Safari — set in System Settings or auto-configured above):"
+echo "  $PAC_URL"
+echo "Firefox: file://$CONFIG_DIR/proxy.pac"
 echo ""
 echo "To uninstall:"
 echo "  launchctl bootout gui/\$(id -u)/$LABEL"
