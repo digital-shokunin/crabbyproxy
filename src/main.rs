@@ -156,14 +156,13 @@ fn get_if_index(name: &str) -> Option<c_uint> {
     if idx == 0 { None } else { Some(idx) }
 }
 
-fn find_interface() -> (String, c_uint) {
+fn find_interface() -> Option<(String, c_uint)> {
     for iface in &["en0", "en6", "en1"] {
         if let Some(idx) = get_if_index(iface) {
-            return (iface.to_string(), idx);
+            return Some((iface.to_string(), idx));
         }
     }
-    eprintln!("No physical interface found");
-    std::process::exit(1);
+    None
 }
 
 async fn relay(mut a: TcpStream, mut b: TcpStream) {
@@ -177,7 +176,6 @@ async fn relay(mut a: TcpStream, mut b: TcpStream) {
 
 async fn handle_client(
     mut client: TcpStream,
-    if_index: c_uint,
     http: Arc<Client>,
     cache: Arc<DnsCache>,
     doh_servers: Arc<Vec<String>>,
@@ -238,7 +236,10 @@ async fn handle_client(
 
     let addr = SocketAddr::new(ip, port);
 
-    // Connect via bound interface
+    // Connect via bound interface (re-detect per connection)
+    let (_, if_index) = find_interface().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::NotFound, "no physical interface available")
+    })?;
     let socket = TcpSocket::new_v4()?;
     bind_to_interface(socket.as_raw_fd(), if_index)?;
 
@@ -265,7 +266,6 @@ async fn handle_client(
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    let (iface, if_index) = find_interface();
     let addr = "127.0.0.1:1080";
     let listener = TcpListener::bind(addr).await?;
 
@@ -278,8 +278,12 @@ async fn main() -> std::io::Result<()> {
     );
     let cache = Arc::new(DnsCache::new());
 
+    let iface_info = find_interface()
+        .map(|(name, idx)| format!("{name} (index {idx})"))
+        .unwrap_or_else(|| "none (will detect per connection)".to_string());
+
     eprintln!(
-        "crabbyproxy: SOCKS5 on {addr}, outbound via {iface} (index {if_index}), DoH servers: {}",
+        "crabbyproxy: SOCKS5 on {addr}, outbound via {iface_info}, DoH servers: {}",
         doh_servers.join(", ")
     );
 
@@ -289,7 +293,7 @@ async fn main() -> std::io::Result<()> {
         let cache = cache.clone();
         let doh_servers = doh_servers.clone();
         tokio::spawn(async move {
-            let _ = handle_client(client, if_index, http, cache, doh_servers).await;
+            let _ = handle_client(client, http, cache, doh_servers).await;
         });
     }
 }
