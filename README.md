@@ -10,16 +10,7 @@ When running a VPN for security testing, bug bounty, or general privacy, certain
 
 ## How it works
 
-```
-Browser
-  |
-  |-- youtube.com, reddit.com  -->  PAC file  -->  crabbyproxy (127.0.0.1:1080)
-  |                                                    |
-  |                                                    +-> DoH (Cloudflare/Google/Quad9)
-  |                                                    +-> IP_BOUND_IF -> en0 (direct)
-  |
-  |-- everything else  -->  DIRECT  -->  WireGuard VPN (utun)
-```
+![crabbyproxy traffic flow](diagram.png)
 
 1. Browser PAC file routes target domains to the local SOCKS5 proxy
 2. Proxy resolves DNS via DoH — bypasses VPN DNS, gets geo-correct CDN IPs
