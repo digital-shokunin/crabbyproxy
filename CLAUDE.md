@@ -2,32 +2,16 @@
 
 Lightweight Rust SOCKS5 proxy for domain-based split tunneling on macOS. Binds outgoing connections to a physical network interface via `IP_BOUND_IF`, bypassing WireGuard's Network Extension. Resolves DNS via DNS-over-HTTPS (Cloudflare/Google/Quad9 with fallback).
 
-## Architecture
-
-```
-Browser (Firefox/Chrome)
-  |
-  |-- youtube.com, reddit.com --> PAC file --> crabbyproxy (127.0.0.1:1080)
-  |                                              |
-  |                                              +--> DoH (1.1.1.1 / 8.8.8.8 / 9.9.9.9)
-  |                                              +--> IP_BOUND_IF binds to en0
-  |                                              |
-  |                                              v
-  |                                         Direct internet (home IP)
-  |
-  |-- everything else --> DIRECT --> WireGuard VPN tunnel (utun)
-```
-
 ## Project structure
 
 ```
-crabbyproxy/          Rust crate (binary)
-  src/main.rs         SOCKS5 proxy with DoH + IP_BOUND_IF
-  Cargo.toml
-  install.sh          Build, install binary, config, and LaunchAgent
-proxy.pac             Browser auto-proxy config (YouTube/Reddit -> SOCKS)
+src/main.rs           SOCKS5 proxy with DoH + IP_BOUND_IF
+Cargo.toml
+install.sh            Build, install binary, config, and LaunchAgent
+proxy.pac             Browser auto-proxy config (YouTube/Reddit/Netflix/Hulu -> SOCKS)
 doh.conf.default      Default DoH server list
 com.digisho.crabbyproxy.plist   LaunchAgent plist
+diagram.png           Architecture diagram for README
 ```
 
 ## Installed locations
@@ -40,37 +24,41 @@ com.digisho.crabbyproxy.plist   LaunchAgent plist
 | LaunchAgent | `~/Library/LaunchAgents/com.digisho.crabbyproxy.plist` |
 | Log | `~/Library/Logs/crabbyproxy.log` |
 
-## Setup
+## Build and install
 
 ```bash
-cd crabbyproxy && ./install.sh
+./install.sh           # build, install, start LaunchAgent
+cargo build --release  # build only
 ```
 
-Then configure browsers:
+After install, configure browsers:
 - **Firefox**: Settings > Network Settings > Automatic proxy configuration URL > `file:///Users/digisho/.config/crabbyproxy/proxy.pac`
 - **Chrome/Safari**: System Settings > Network > Wi-Fi > Details > Proxies > Automatic Proxy Configuration > same URL
 
-## Adding new sites
+## Key behaviors
 
-Edit `~/.config/crabbyproxy/proxy.pac` — add `shExpMatch()` rules. Browser reloads automatically or restart to pick up changes.
+- **Dynamic interface detection**: re-detects the active physical interface (en0/en6/en1) on every connection. Handles Wi-Fi/Ethernet switching without restart.
+- **DoH with fallback**: tries Cloudflare, Google, Quad9 in order. Configurable via `~/.config/crabbyproxy/doh.conf`.
+- **TTL-aware DNS cache**: caches DoH responses, clamped to 30s-5min TTL.
+- **Personal PAC file**: the installed PAC at `~/.config/crabbyproxy/proxy.pac` may differ from the repo default (personal domains like Gmail, Kagi added locally).
 
-## Changing DoH servers
+## Adding sites
 
-Edit `~/.config/crabbyproxy/doh.conf` (one URL per line). Restart proxy: `launchctl kickstart -k gui/$(id -u)/com.digisho.crabbyproxy`
+Edit `~/.config/crabbyproxy/proxy.pac`, add `shExpMatch()` rules. Browser picks up changes on reload.
 
-## How it works
+## Restart proxy
 
-The macOS WireGuard app uses a Network Extension that intercepts all packets before the routing table. IP-based split tunneling (AllowedIPs, route add) cannot bypass it reliably. This proxy operates at the application layer instead:
+```bash
+launchctl kickstart -k gui/$(id -u)/com.digisho.crabbyproxy
+```
 
-1. Browser PAC file routes target domains to SOCKS5 proxy on localhost
-2. Proxy resolves domains via DoH (bypasses VPN's DNS)
-3. Proxy opens outgoing connections with `IP_BOUND_IF` set to the physical interface (en0/en6)
-4. macOS honors `IP_BOUND_IF` even with the VPN NE active — traffic goes direct
-5. All other browser traffic goes DIRECT through the VPN as normal
+## Homebrew tap
+
+Separate repo: `digital-shokunin/homebrew-crabbyproxy`. Update the formula SHA and version when tagging new releases.
 
 ## Dependencies
 
-- `tokio` — async runtime
-- `reqwest` + `serde` — DoH JSON API client
-- `libc` — `IP_BOUND_IF` setsockopt
-- `dirs` — XDG config path resolution
+- `tokio`: async runtime
+- `reqwest` + `serde`: DoH JSON API client
+- `libc`: `IP_BOUND_IF` setsockopt
+- `dirs`: config path resolution
