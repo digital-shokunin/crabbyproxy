@@ -165,6 +165,32 @@ fn find_interface() -> Option<(String, c_uint)> {
     None
 }
 
+async fn serve_pac_file(pac_path: std::path::PathBuf) {
+    let listener = match TcpListener::bind("127.0.0.1:1081").await {
+        Ok(l) => l,
+        Err(e) => {
+            eprintln!("crabbyproxy: PAC server failed to bind port 1081: {e}");
+            return;
+        }
+    };
+    eprintln!("crabbyproxy: PAC server on http://127.0.0.1:1081/proxy.pac");
+    loop {
+        let Ok((mut conn, _)) = listener.accept().await else { continue };
+        let pac_path = pac_path.clone();
+        tokio::spawn(async move {
+            let mut buf = [0u8; 1024];
+            let _ = conn.read(&mut buf).await;
+            let body = std::fs::read_to_string(&pac_path).unwrap_or_default();
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/x-ns-proxy-autoconfig\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = conn.write_all(response.as_bytes()).await;
+        });
+    }
+}
+
 async fn relay(mut a: TcpStream, mut b: TcpStream) {
     let (mut ar, mut aw) = a.split();
     let (mut br, mut bw) = b.split();
@@ -286,6 +312,11 @@ async fn main() -> std::io::Result<()> {
         "crabbyproxy: SOCKS5 on {addr}, outbound via {iface_info}, DoH servers: {}",
         doh_servers.join(", ")
     );
+
+    let pac_path = dirs::home_dir()
+        .map(|h| h.join(".config/crabbyproxy/proxy.pac"))
+        .unwrap_or_default();
+    tokio::spawn(serve_pac_file(pac_path));
 
     loop {
         let (client, _) = listener.accept().await?;

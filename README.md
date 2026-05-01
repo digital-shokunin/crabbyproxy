@@ -1,4 +1,6 @@
-# crabbyproxy
+# crabbyproxy 🦀
+
+> Named for [Ferris](https://rustacean.net/), Rust's unofficial crab mascot.
 
 Lightweight Rust SOCKS5 proxy that binds outgoing connections to a specific network interface via macOS `IP_BOUND_IF`, enabling domain-based split tunneling where IP-based routing falls short.
 
@@ -25,6 +27,7 @@ When running a VPN for security testing, bug bounty, or general privacy, certain
 - **TTL-aware DNS cache** — minimal DoH queries
 - **Interface auto-detection** — finds en0/en6/en1 automatically
 - **Zero config WireGuard** — no AllowedIPs changes, no PostUp/PostDown
+- **PAC file HTTP server** — serves proxy.pac over HTTP on port 1081 (Chrome compatible)
 - **LaunchAgent** — starts at login, auto-restarts on crash
 - **~2MB binary** — async Rust with tokio
 
@@ -57,11 +60,14 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.digisho.crabbyproxy.
 Set the automatic proxy configuration URL:
 
 - **Firefox**: Settings > Network Settings > Automatic proxy configuration URL
+  ```
+  file:///Users/YOUR_USERNAME/.config/crabbyproxy/proxy.pac
+  ```
 - **Chrome/Safari**: System Settings > Network > Wi-Fi > Details > Proxies > Automatic Proxy Configuration
-
-```
-file:///Users/YOUR_USERNAME/.config/crabbyproxy/proxy.pac
-```
+  ```
+  http://127.0.0.1:1081/proxy.pac
+  ```
+  Chrome blocks `file://` PAC URLs for security reasons. crabbyproxy serves the PAC file over HTTP on port 1081 for Chrome compatibility.
 
 ## Configuration
 
