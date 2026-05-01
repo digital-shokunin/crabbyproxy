@@ -1,0 +1,18 @@
+[package]
+name = "crabbyproxy"
+version = "0.1.0"
+edition = "2024"
+description = "Lightweight SOCKS5 proxy that binds to a specific network interface via IP_BOUND_IF for domain-based split tunneling"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+libc = "0.2"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+dirs = "6"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

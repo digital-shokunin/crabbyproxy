@@ -1,0 +1,4 @@
+# DNS-over-HTTPS servers (one per line, tried in order with fallback)
+https://1.1.1.1/dns-query
+https://8.8.8.8/dns-query
+https://9.9.9.9:5053/dns-query

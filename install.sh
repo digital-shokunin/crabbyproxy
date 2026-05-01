@@ -1,0 +1,80 @@
+#!/bin/bash
+# Install crabbyproxy — SOCKS5 proxy with interface binding and DoH
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BIN_DIR="${HOME}/.local/bin"
+CONFIG_DIR="${HOME}/.config/crabbyproxy"
+LAUNCH_DIR="${HOME}/Library/LaunchAgents"
+LABEL="com.digisho.crabbyproxy"
+PLIST_SRC="${SCRIPT_DIR}/com.digisho.crabbyproxy.plist"
+
+echo "=== crabbyproxy installer ==="
+
+# Build
+echo "Building release binary..."
+cd "$SCRIPT_DIR"
+cargo build --release
+BINARY="$SCRIPT_DIR/target/release/crabbyproxy"
+
+# Install binary
+echo "Installing to $BIN_DIR/"
+mkdir -p "$BIN_DIR"
+cp "$BINARY" "$BIN_DIR/crabbyproxy"
+chmod 755 "$BIN_DIR/crabbyproxy"
+
+# Install default config
+echo "Setting up config in $CONFIG_DIR/"
+mkdir -p "$CONFIG_DIR"
+if [[ ! -f "$CONFIG_DIR/doh.conf" ]]; then
+  cat > "$CONFIG_DIR/doh.conf" << 'EOF'
+# DNS-over-HTTPS servers (one per line, tried in order with fallback)
+https://1.1.1.1/dns-query
+https://8.8.8.8/dns-query
+https://9.9.9.9:5053/dns-query
+EOF
+  echo "  Created doh.conf"
+else
+  echo "  doh.conf already exists, skipping"
+fi
+
+# Install PAC file
+PAC_SRC="${SCRIPT_DIR}/proxy.pac"
+if [[ -f "$PAC_SRC" ]]; then
+  if [[ ! -f "$CONFIG_DIR/proxy.pac" ]]; then
+    cp "$PAC_SRC" "$CONFIG_DIR/proxy.pac"
+    echo "  Created proxy.pac"
+  else
+    echo "  proxy.pac already exists, skipping"
+  fi
+fi
+
+# Install LaunchAgent
+echo "Installing LaunchAgent..."
+mkdir -p "$LAUNCH_DIR"
+if [[ -f "$PLIST_SRC" ]]; then
+  # Unload existing
+  launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+  cp "$PLIST_SRC" "$LAUNCH_DIR/${LABEL}.plist"
+  launchctl bootstrap "gui/$(id -u)" "$LAUNCH_DIR/${LABEL}.plist"
+  echo "  Daemon started"
+else
+  echo "  WARNING: plist not found at $PLIST_SRC"
+fi
+
+echo ""
+echo "Done."
+echo ""
+echo "Binary:   $BIN_DIR/crabbyproxy"
+echo "Config:   $CONFIG_DIR/doh.conf"
+echo "PAC file: $CONFIG_DIR/proxy.pac"
+echo "Log:      ~/Library/Logs/crabbyproxy.log"
+echo ""
+echo "Next step: Configure your browser proxy to:"
+echo "  file://$CONFIG_DIR/proxy.pac"
+echo ""
+echo "To uninstall:"
+echo "  launchctl bootout gui/\$(id -u)/$LABEL"
+echo "  rm $BIN_DIR/crabbyproxy"
+echo "  rm $LAUNCH_DIR/${LABEL}.plist"
+echo "  rm -rf $CONFIG_DIR"
