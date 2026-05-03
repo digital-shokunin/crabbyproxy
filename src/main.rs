@@ -5,10 +5,12 @@ use std::collections::HashMap;
 use std::ffi::CString;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::os::fd::AsRawFd;
+use std::process::Stdio;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpSocket, TcpStream};
+use tokio::process::Command as Process;
 use tokio::sync::RwLock;
 
 const IP_BOUND_IF: i32 = 25; // macOS setsockopt constant
@@ -290,6 +292,57 @@ async fn handle_client(
     Ok(())
 }
 
+async fn get_primary_interface() -> Option<String> {
+    let mut child = Process::new("scutil")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(b"open\nshow State:/Network/Global/IPv4\nquit\n").await;
+    }
+
+    let output = child.wait_with_output().await.ok()?;
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        if let Some(rest) = line.trim().strip_prefix("PrimaryInterface :") {
+            return Some(rest.trim().to_string());
+        }
+    }
+    None
+}
+
+async fn set_scutil_proxy(_pac_url: &str) {
+    let helper = dirs::home_dir()
+        .map(|h| h.join(".local/bin/crabbyproxy-setpac"))
+        .unwrap_or_default();
+    let _ = Process::new("sudo")
+        .arg(&helper)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()
+        .map(|mut c| async move { let _ = c.wait().await; });
+}
+
+async fn watch_wireguard_proxy(pac_url: String) {
+    eprintln!("crabbyproxy: watching for WireGuard, will set PAC in SCDynamicStore");
+    let mut last_was_vpn = false;
+    loop {
+        let primary = get_primary_interface().await.unwrap_or_default();
+        let is_vpn = primary.starts_with("utun");
+
+        if is_vpn && !last_was_vpn {
+            eprintln!("crabbyproxy: WireGuard active on {primary}, setting PAC in SCDynamicStore");
+            set_scutil_proxy(&pac_url).await;
+        }
+        last_was_vpn = is_vpn;
+
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    }
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let addr = "127.0.0.1:1080";
@@ -313,10 +366,12 @@ async fn main() -> std::io::Result<()> {
         doh_servers.join(", ")
     );
 
+    let pac_url = "http://127.0.0.1:1081/proxy.pac".to_string();
     let pac_path = dirs::home_dir()
         .map(|h| h.join(".config/crabbyproxy/proxy.pac"))
         .unwrap_or_default();
     tokio::spawn(serve_pac_file(pac_path));
+    tokio::spawn(watch_wireguard_proxy(pac_url));
 
     loop {
         let (client, _) = listener.accept().await?;
