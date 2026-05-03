@@ -28,6 +28,7 @@ When running a VPN for security testing, bug bounty, or general privacy, certain
 - **Interface auto-detection** — finds en0/en6/en1 automatically
 - **Zero config WireGuard** — no AllowedIPs changes, no PostUp/PostDown
 - **PAC file HTTP server** — serves proxy.pac over HTTP on port 1081 (Chrome compatible)
+- **WireGuard watcher** — detects when WireGuard becomes active, injects PAC into SCDynamicStore so Chrome picks it up automatically
 - **LaunchAgent** — starts at login, auto-restarts on crash
 - **~2MB binary** — async Rust with tokio
 
@@ -68,6 +69,8 @@ Set the automatic proxy configuration URL:
   http://127.0.0.1:1081/proxy.pac
   ```
   Chrome blocks `file://` PAC URLs for security reasons. crabbyproxy serves the PAC file over HTTP on port 1081 for Chrome compatibility.
+
+  When WireGuard is active, crabbyproxy automatically injects the PAC URL into the system network state (SCDynamicStore) so Chrome picks it up without any manual configuration.
 
 ## Configuration
 

@@ -1,0 +1,12 @@
+#!/bin/bash
+# crabbyproxy-setpac — sets PAC URL in SCDynamicStore (requires root)
+# Called by crabbyproxy's WireGuard watcher via NOPASSWD sudo
+scutil <<'EOF'
+open
+d.init
+d.add ProxyAutoConfigEnable # 1
+d.add ProxyAutoConfigURLString http://127.0.0.1:1081/proxy.pac
+d.add FTPPassive # 1
+set State:/Network/Global/Proxies
+quit
+EOF

@@ -17,11 +17,23 @@ cd "$SCRIPT_DIR"
 cargo build --release
 BINARY="$SCRIPT_DIR/target/release/crabbyproxy"
 
-# Install binary
+# Install binary and setpac helper
 echo "Installing to $BIN_DIR/"
 mkdir -p "$BIN_DIR"
 cp "$BINARY" "$BIN_DIR/crabbyproxy"
 chmod 755 "$BIN_DIR/crabbyproxy"
+cp "${SCRIPT_DIR}/crabbyproxy-setpac" "$BIN_DIR/crabbyproxy-setpac"
+chmod 755 "$BIN_DIR/crabbyproxy-setpac"
+
+# Sudoers entry for crabbyproxy-setpac (allows watcher to set SCDynamicStore proxy without password)
+SUDOERS_FILE="/etc/sudoers.d/crabbyproxy-setpac"
+SUDOERS_RULE="$(whoami) ALL=(ALL) NOPASSWD: $BIN_DIR/crabbyproxy-setpac"
+if ! sudo -n grep -qF "$BIN_DIR/crabbyproxy-setpac" "$SUDOERS_FILE" 2>/dev/null; then
+  echo "Configuring sudoers for crabbyproxy-setpac (may prompt for password)..."
+  osascript -e "do shell script \"echo '$SUDOERS_RULE' > $SUDOERS_FILE && chmod 440 $SUDOERS_FILE\" with administrator privileges" 2>/dev/null \
+    && echo "  sudoers entry added" \
+    || echo "  WARNING: could not add sudoers entry — Chrome proxy won't auto-configure with WireGuard"
+fi
 
 # Install default config
 echo "Setting up config in $CONFIG_DIR/"

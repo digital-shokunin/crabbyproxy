@@ -20,10 +20,44 @@ const DEFAULT_DOH_SERVERS: &[&str] = &[
     "https://9.9.9.9:5053/dns-query",  // Quad9
 ];
 
-fn load_doh_servers() -> Vec<String> {
-    let config_path = dirs::home_dir()
-        .map(|h| h.join(".config/crabbyproxy/doh.conf"))
+fn config_dir() -> std::path::PathBuf {
+    let user_dir = dirs::home_dir()
+        .map(|h| h.join(".config/crabbyproxy"))
         .unwrap_or_default();
+
+    if user_dir.join("proxy.pac").exists() || user_dir.join("doh.conf").exists() {
+        return user_dir;
+    }
+
+    // Fallback: etc/ sibling of binary (Homebrew: /opt/homebrew/bin/../etc/crabbyproxy)
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(prefix) = exe.parent().and_then(|b| b.parent()) {
+            let etc_dir = prefix.join("etc/crabbyproxy");
+            if etc_dir.exists() {
+                return etc_dir;
+            }
+        }
+    }
+
+    user_dir
+}
+
+fn find_setpac_helper() -> Option<std::path::PathBuf> {
+    // Next to binary (Homebrew: /opt/homebrew/bin/crabbyproxy-setpac)
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(bin_dir) = exe.parent() {
+            let p = bin_dir.join("crabbyproxy-setpac");
+            if p.exists() { return Some(p); }
+        }
+    }
+    // install.sh location
+    dirs::home_dir()
+        .map(|h| h.join(".local/bin/crabbyproxy-setpac"))
+        .filter(|p| p.exists())
+}
+
+fn load_doh_servers() -> Vec<String> {
+    let config_path = config_dir().join("doh.conf");
 
     if config_path.exists() {
         if let Ok(contents) = std::fs::read_to_string(&config_path) {
@@ -313,20 +347,22 @@ async fn get_primary_interface() -> Option<String> {
     None
 }
 
-async fn set_scutil_proxy(_pac_url: &str) {
-    let helper = dirs::home_dir()
-        .map(|h| h.join(".local/bin/crabbyproxy-setpac"))
-        .unwrap_or_default();
-    let _ = Process::new("sudo")
+async fn set_scutil_proxy() {
+    let Some(helper) = find_setpac_helper() else {
+        eprintln!("crabbyproxy: crabbyproxy-setpac not found, Chrome proxy won't be set");
+        return;
+    };
+    if let Ok(mut child) = Process::new("sudo")
         .arg(&helper)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .ok()
-        .map(|mut c| async move { let _ = c.wait().await; });
+    {
+        let _ = child.wait().await;
+    }
 }
 
-async fn watch_wireguard_proxy(pac_url: String) {
+async fn watch_wireguard_proxy() {
     eprintln!("crabbyproxy: watching for WireGuard, will set PAC in SCDynamicStore");
     let mut last_was_vpn = false;
     loop {
@@ -335,7 +371,7 @@ async fn watch_wireguard_proxy(pac_url: String) {
 
         if is_vpn && !last_was_vpn {
             eprintln!("crabbyproxy: WireGuard active on {primary}, setting PAC in SCDynamicStore");
-            set_scutil_proxy(&pac_url).await;
+            set_scutil_proxy().await;
         }
         last_was_vpn = is_vpn;
 
@@ -366,12 +402,9 @@ async fn main() -> std::io::Result<()> {
         doh_servers.join(", ")
     );
 
-    let pac_url = "http://127.0.0.1:1081/proxy.pac".to_string();
-    let pac_path = dirs::home_dir()
-        .map(|h| h.join(".config/crabbyproxy/proxy.pac"))
-        .unwrap_or_default();
+    let pac_path = config_dir().join("proxy.pac");
     tokio::spawn(serve_pac_file(pac_path));
-    tokio::spawn(watch_wireguard_proxy(pac_url));
+    tokio::spawn(watch_wireguard_proxy());
 
     loop {
         let (client, _) = listener.accept().await?;
