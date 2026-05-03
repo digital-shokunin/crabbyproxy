@@ -38,27 +38,11 @@ fi
 # Install default config
 echo "Setting up config in $CONFIG_DIR/"
 mkdir -p "$CONFIG_DIR"
-if [[ ! -f "$CONFIG_DIR/doh.conf" ]]; then
-  cat > "$CONFIG_DIR/doh.conf" << 'EOF'
-# DNS-over-HTTPS servers (one per line, tried in order with fallback)
-https://1.1.1.1/dns-query
-https://8.8.8.8/dns-query
-https://9.9.9.9:5053/dns-query
-EOF
-  echo "  Created doh.conf"
+if [[ ! -f "$CONFIG_DIR/config.toml" ]]; then
+  cp "${SCRIPT_DIR}/config.toml.default" "$CONFIG_DIR/config.toml"
+  echo "  Created config.toml"
 else
-  echo "  doh.conf already exists, skipping"
-fi
-
-# Install PAC file
-PAC_SRC="${SCRIPT_DIR}/proxy.pac"
-if [[ -f "$PAC_SRC" ]]; then
-  if [[ ! -f "$CONFIG_DIR/proxy.pac" ]]; then
-    cp "$PAC_SRC" "$CONFIG_DIR/proxy.pac"
-    echo "  Created proxy.pac"
-  else
-    echo "  proxy.pac already exists, skipping"
-  fi
+  echo "  config.toml already exists, skipping"
 fi
 
 # Install LaunchAgent
@@ -89,8 +73,7 @@ echo ""
 echo "Done."
 echo ""
 echo "Binary:   $BIN_DIR/crabbyproxy"
-echo "Config:   $CONFIG_DIR/doh.conf"
-echo "PAC file: $CONFIG_DIR/proxy.pac"
+echo "Config:   $CONFIG_DIR/config.toml"
 echo "Log:      ~/Library/Logs/crabbyproxy.log"
 echo ""
 echo "Browser PAC URL (Chrome/Safari — set in System Settings or auto-configured above):"

@@ -15,25 +15,21 @@ RUN cargo install --locked --root ${HOMEBREW_PREFIX} --path . \
     && echo "PASS: cargo install"
 
 # Step 2: install config files (formula install block)
-RUN cp proxy.pac ${HOMEBREW_PREFIX}/etc/crabbyproxy/proxy.pac \
-    && cp doh.conf.default ${HOMEBREW_PREFIX}/etc/crabbyproxy/doh.conf \
+RUN cp config.toml.default ${HOMEBREW_PREFIX}/etc/crabbyproxy/config.toml \
     && cp crabbyproxy-setpac ${HOMEBREW_PREFIX}/bin/crabbyproxy-setpac \
     && chmod 755 ${HOMEBREW_PREFIX}/bin/crabbyproxy-setpac \
     && echo "PASS: config files installed"
 
 # Step 3: post_install — copy to ~/.config/crabbyproxy if not present
 RUN mkdir -p /root/.config/crabbyproxy \
-    && cp ${HOMEBREW_PREFIX}/etc/crabbyproxy/proxy.pac /root/.config/crabbyproxy/proxy.pac \
-    && cp ${HOMEBREW_PREFIX}/etc/crabbyproxy/doh.conf /root/.config/crabbyproxy/doh.conf \
+    && cp ${HOMEBREW_PREFIX}/etc/crabbyproxy/config.toml /root/.config/crabbyproxy/config.toml \
     && echo "PASS: post_install config copy"
 
 # Step 4: verify binary and all expected files
 RUN test -x ${HOMEBREW_PREFIX}/bin/crabbyproxy && echo "PASS: binary present"
-RUN test -f ${HOMEBREW_PREFIX}/etc/crabbyproxy/proxy.pac && echo "PASS: pac in etc"
-RUN test -f ${HOMEBREW_PREFIX}/etc/crabbyproxy/doh.conf && echo "PASS: doh in etc"
+RUN test -f ${HOMEBREW_PREFIX}/etc/crabbyproxy/config.toml && echo "PASS: config.toml in etc"
 RUN test -f ${HOMEBREW_PREFIX}/bin/crabbyproxy-setpac && echo "PASS: setpac helper present"
-RUN test -f /root/.config/crabbyproxy/proxy.pac && echo "PASS: pac in user config"
-RUN test -f /root/.config/crabbyproxy/doh.conf && echo "PASS: doh in user config"
+RUN test -f /root/.config/crabbyproxy/config.toml && echo "PASS: config.toml in user config"
 
 # Step 5: binary starts and logs expected output (macOS features unavailable but startup should succeed)
 RUN timeout 3 ${HOMEBREW_PREFIX}/bin/crabbyproxy 2>&1 | tee /tmp/startup.log || true \

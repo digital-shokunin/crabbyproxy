@@ -1,0 +1,38 @@
+[doh]
+servers = [
+    "https://1.1.1.1/dns-query",      # Cloudflare
+    "https://8.8.8.8/dns-query",      # Google
+    "https://9.9.9.9:5053/dns-query", # Quad9
+]
+
+[proxy]
+socks_port = 1080
+pac_port = 1081
+domains = [
+    # YouTube
+    "*.youtube.com",
+    "youtube.com",
+    "*.googlevideo.com",
+    "*.ytimg.com",
+    "*.youtube-nocookie.com",
+    "youtube-nocookie.com",
+    "*.ggpht.com",
+    "*.googleapis.com",
+    # Reddit
+    "*.reddit.com",
+    "reddit.com",
+    "*.redd.it",
+    "*.redditstatic.com",
+    # Hulu
+    "*.hulu.com",
+    "hulu.com",
+    "*.hulustream.com",
+    "*.huluim.com",
+    # Netflix
+    "*.netflix.com",
+    "netflix.com",
+    "*.nflxvideo.net",
+    "*.nflximg.net",
+    "*.nflxso.net",
+    "*.nflxext.com",
+]

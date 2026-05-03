@@ -5,13 +5,13 @@ Lightweight Rust SOCKS5 proxy for domain-based split tunneling on macOS. Binds o
 ## Project structure
 
 ```
-src/main.rs           SOCKS5 proxy with DoH + IP_BOUND_IF
+src/main.rs              SOCKS5 proxy with DoH + IP_BOUND_IF
 Cargo.toml
-install.sh            Build, install binary, config, and LaunchAgent
-proxy.pac             Browser auto-proxy config (YouTube/Reddit/Netflix/Hulu -> SOCKS)
-doh.conf.default      Default DoH server list
+install.sh               Build, install binary, config, and LaunchAgent
+config.toml.default      Default unified config (DoH servers + proxy domains)
+crabbyproxy-setpac       Shell helper (runs as root via sudo) to set SCDynamicStore proxy
 com.digisho.crabbyproxy.plist   LaunchAgent plist
-diagram.png           Architecture diagram for README
+diagram.png              Architecture diagram for README
 ```
 
 ## Installed locations
@@ -19,8 +19,8 @@ diagram.png           Architecture diagram for README
 | File | Location |
 |------|----------|
 | Binary | `~/.local/bin/crabbyproxy` |
-| DoH config | `~/.config/crabbyproxy/doh.conf` |
-| PAC file | `~/.config/crabbyproxy/proxy.pac` |
+| setpac helper | `~/.local/bin/crabbyproxy-setpac` |
+| Config | `~/.config/crabbyproxy/config.toml` |
 | LaunchAgent | `~/Library/LaunchAgents/com.digisho.crabbyproxy.plist` |
 | Log | `~/Library/Logs/crabbyproxy.log` |
 
@@ -32,19 +32,21 @@ cargo build --release  # build only
 ```
 
 After install, configure browsers:
-- **Firefox**: Settings > Network Settings > Automatic proxy configuration URL > `file:///Users/digisho/.config/crabbyproxy/proxy.pac`
-- **Chrome/Safari**: System Settings > Network > Wi-Fi > Details > Proxies > Automatic Proxy Configuration > same URL
+- **Firefox**: Settings > Network Settings > Automatic proxy configuration URL > `http://127.0.0.1:1081/proxy.pac`
+- **Chrome/Safari**: System Settings > Network > Wi-Fi > Details > Proxies > Automatic Proxy Configuration > `http://127.0.0.1:1081/proxy.pac`
 
 ## Key behaviors
 
 - **Dynamic interface detection**: re-detects the active physical interface (en0/en6/en1) on every connection. Handles Wi-Fi/Ethernet switching without restart.
-- **DoH with fallback**: tries Cloudflare, Google, Quad9 in order. Configurable via `~/.config/crabbyproxy/doh.conf`.
+- **DoH with fallback**: tries Cloudflare, Google, Quad9 in order. Configurable via `[doh] servers` in `config.toml`.
 - **TTL-aware DNS cache**: caches DoH responses, clamped to 30s-5min TTL.
-- **Personal PAC file**: the installed PAC at `~/.config/crabbyproxy/proxy.pac` may differ from the repo default (personal domains like Gmail, Kagi added locally).
+- **PAC generated in memory**: domains list in `config.toml` → PAC served over HTTP on port 1081. No separate proxy.pac needed.
+- **WireGuard watcher**: detects utun interface, calls `sudo crabbyproxy-setpac` to write PAC URL into SCDynamicStore so Chrome picks it up automatically.
+- **Personal config**: `~/.config/crabbyproxy/config.toml` may have personal domains added locally.
 
 ## Adding sites
 
-Edit `~/.config/crabbyproxy/proxy.pac`, add `shExpMatch()` rules. Browser picks up changes on reload.
+Edit `~/.config/crabbyproxy/config.toml`, add domains to the `[proxy] domains` list. Restart proxy to apply.
 
 ## Restart proxy
 
@@ -62,3 +64,4 @@ Separate repo: `digital-shokunin/homebrew-crabbyproxy`. Update the formula SHA a
 - `reqwest` + `serde`: DoH JSON API client
 - `libc`: `IP_BOUND_IF` setsockopt
 - `dirs`: config path resolution
+- `toml`: config.toml parsing

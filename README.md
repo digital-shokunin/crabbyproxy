@@ -74,28 +74,27 @@ Set the automatic proxy configuration URL:
 
 ## Configuration
 
-### Adding domains to bypass VPN
+All settings live in `~/.config/crabbyproxy/config.toml`:
 
-Edit `~/.config/crabbyproxy/proxy.pac`:
+```toml
+[doh]
+servers = [
+    "https://1.1.1.1/dns-query",      # Cloudflare
+    "https://8.8.8.8/dns-query",      # Google
+    "https://9.9.9.9:5053/dns-query", # Quad9
+]
 
-```javascript
-function FindProxyForURL(url, host) {
-  if (shExpMatch(host, "*.youtube.com") ||
-      shExpMatch(host, "*.example.com"))  // add your domains
-    return "SOCKS5 127.0.0.1:1080";
-  return "DIRECT";
-}
+[proxy]
+socks_port = 1080
+pac_port = 1081
+domains = [
+    "*.youtube.com",
+    "youtube.com",
+    "*.example.com",  # add your domains here
+]
 ```
 
-### DoH servers
-
-Edit `~/.config/crabbyproxy/doh.conf` (one URL per line, tried in order):
-
-```
-https://1.1.1.1/dns-query
-https://8.8.8.8/dns-query
-https://9.9.9.9:5053/dns-query
-```
+The PAC file is generated in memory from the `domains` list — no separate `proxy.pac` needed.
 
 Restart after changes: `launchctl kickstart -k gui/$(id -u)/com.digisho.crabbyproxy`
 
