@@ -58,19 +58,12 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.digisho.crabbyproxy.
 
 ## Browser setup
 
-Set the automatic proxy configuration URL:
+Set `http://127.0.0.1:1081/proxy.pac` as the automatic proxy configuration URL in every browser:
 
 - **Firefox**: Settings > Network Settings > Automatic proxy configuration URL
-  ```
-  file:///Users/YOUR_USERNAME/.config/crabbyproxy/proxy.pac
-  ```
 - **Chrome/Safari**: System Settings > Network > Wi-Fi > Details > Proxies > Automatic Proxy Configuration
-  ```
-  http://127.0.0.1:1081/proxy.pac
-  ```
-  Chrome blocks `file://` PAC URLs for security reasons. crabbyproxy serves the PAC file over HTTP on port 1081 for Chrome compatibility.
 
-  When WireGuard is active, crabbyproxy automatically injects the PAC URL into the system network state (SCDynamicStore) so Chrome picks it up without any manual configuration.
+When WireGuard is active, crabbyproxy automatically injects the PAC URL into the system network state (SCDynamicStore) so Chrome/Safari pick it up without any manual configuration.
 
 ## Configuration
 
