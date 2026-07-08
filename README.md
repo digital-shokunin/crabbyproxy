@@ -91,6 +91,10 @@ The PAC file is generated in memory from the `domains` list — no separate `pro
 
 Restart after changes: `launchctl kickstart -k gui/$(id -u)/com.digisho.crabbyproxy`
 
+## GUI
+
+If you'd like a GUI/menu tool for this, baha2046 has made a companion app called [ProxyBar](https://github.com/baha2046/ProxyBar). Check it out!
+
 ## Why not just use AllowedIPs?
 
 WireGuard's `AllowedIPs` is IP-based, not domain-based. Services like YouTube use thousands of dynamic CDN IPs across dozens of subnets. Excluding them all creates hundreds of CIDR ranges that can break the tunnel. The macOS WireGuard app's Network Extension also intercepts packets before the routing table, making `route add` commands ineffective.
